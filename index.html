@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>奇门遁甲·智能解盘</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Microsoft YaHei", "苹方", sans-serif;
+      background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0d5c1;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(30, 30, 50, 0.85);
+      backdrop-filter: blur(20px);
+      border-radius: 28px;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      border: 1px solid rgba(201, 168, 76, 0.3);
+    }
+    h1 {
+      text-align: center;
+      color: #f0d78c;
+      margin-bottom: 6px;
+      font-size: 26px;
+      letter-spacing: 2px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #a0a0b0;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    label { display: block; margin: 18px 0 6px; color: #c0b890; font-weight: bold; font-size: 15px; }
+    input, textarea, select, button {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #3a3a5a;
+      border-radius: 16px;
+      background: #252540;
+      color: #e0d5c1;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: #c9a84c;
+      box-shadow: 0 0 10px rgba(201,168,76,0.3);
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    button {
+      background: linear-gradient(135deg, #8b6914, #c9a84c);
+      color: #1a1a2e;
+      font-weight: bold;
+      font-size: 18px;
+      border: none;
+      margin-top: 24px;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 1px;
+    }
+    button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(201,168,76,0.4); }
+    button:disabled { background: #555; cursor: not-allowed; transform: none; }
+    .result-box {
+      margin-top: 24px;
+      padding: 20px;
+      background: #1a1a30;
+      border-radius: 18px;
+      border: 1px solid #c9a84c;
+      white-space: pre-wrap;
+      line-height: 1.8;
+      display: none;
+    }
+    .result-box.show { display: block; }
+    .loading {
+      text-align: center;
+      color: #c9a84c;
+      margin-top: 16px;
+      display: none;
+    }
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      background: #252540;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .tab.active { background: #c9a84c; color: #1a1a2e; }
+    .note { font-size: 12px; color: #888; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🛐 奇门遁甲 · 解盘</h1>
+  <div class="subtitle">严格按说明书逻辑 · 转盘拆补</div>
+
+  <label>📅 公历日期和时间</label>
+  <input type="datetime-local" id="datetimeInput">
+
+  <label>❓ 想问的事情</label>
+  <textarea id="questionInput" placeholder="例如：这次合作的前景如何？"></textarea>
+
+  <label>📖 你的解盘规则</label>
+  <textarea id="ruleInput" placeholder="输入规则，例如：问财运优先看生门宫和戊所在宫..."></textarea>
+  <div class="note">💡 AI会严格按你写的规则来解读盘局</div>
+
+  <!-- ✅ 补上了流派选择下拉框 -->
+  <label>流派选择</label>
+  <select id="schoolInput">
+    <option value="转盘">转盘奇门</option>
+    <option value="飞盘">飞盘奇门</option>
+    <option value="阴盘">阴盘奇门</option>
+  </select>
+
+  <button id="submitBtn" onclick="startJiepan()">🔮 开始排盘并解盘</button>
+  <div class="loading" id="loading" style="display: none;">⏳ 正在排盘与分析...</div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('pan')">📋 排盘结果</div>
+    <div class="tab" onclick="showTab('analysis')">📖 解盘分析</div>
+  </div>
+  <div class="result-box show" id="panResult"></div>
+  <div class="result-box" id="analysisResult"></div>
+</div>
+
+<script>
+// ==================== 资源库 ====================
+const TIAN_GAN = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+const DI_ZHI = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+const YI_QI = ["戊","己","庚","辛","壬","癸","丁","丙","乙"];
+const XING_LIST = ["蓬","任","冲","辅","英","芮","柱","心"];
+const MEN_LIST = ["休","生","伤","杜","景","死","惊","开"];
+const SHEN_LIST = ["值符","螣蛇","太阴","六合","白虎","玄武","九地","九天"];
+const GONG_ORDER = [1,8,3,4,9,2,7,6];
+const GONG_NAMES = {1:"坎一宫",8:"艮八宫",3:"震三宫",4:"巽四宫",9:"离九宫",2:"坤二宫",7:"兑七宫",6:"乾六宫"};
+const GONG_NUMBERS = [1,2,3,4,5,6,7,8,9];
+
+const JU_TABLE = {
+  "立春":[8,5,2], "雨水":[9,6,3], "惊蛰":[1,7,4], "春分":[3,9,6], "清明":[4,1,7], "谷雨":[5,2,8],
+  "立夏":[4,1,7], "小满":[5,2,8], "芒种":[6,3,9], "夏至":[9,3,6], "小暑":[8,2,5], "大暑":[7,1,4],
+  "立秋":[2,5,8], "处暑":[1,4,7], "白露":[9,3,6], "秋分":[7,1,4], "寒露":[6,9,3], "霜降":[5,8,2],
+  "立冬":[6,9,3], "小雪":[5,8,2], "大雪":[4,7,1], "冬至":[1,7,4], "小寒":[2,8,5], "大寒":[3,9,6]
+};
+const YANG_DUN_LIST = ["冬至","小寒","大寒","立春","雨水","惊蛰","春分","清明","谷雨","立夏","小满","芒种"];
+
+const JIE_QI_DATA = {
+  2024: {"立春":[2,4],"雨水":[2,19],"惊蛰":[3,5],"春分":[3,20],"清明":[4,4],"谷雨":[4,19],"立夏":[5,5],"小满":[5,20],"芒种":[6,5],"夏至":[6,21],"小暑":[7,6],"大暑":[7,22],"立秋":[8,7],"处暑":[8,22],"白露":[9,7],"秋分":[9,22],"寒露":[10,8],"霜降":[10,23],"立冬":[11,7],"小雪":[11,22],"大雪":[12,6],"冬至":[12,21]},
+  2025: {"立春":[2,3],"雨水":[2,18],"惊蛰":[3,5],"春分":[3,20],"清明":[4,4],"谷雨":[4,20],"立夏":[5,5],"小满":[5,21],"芒种":[6,5],"夏至":[6,21],"小暑":[7,7],"大暑":[7,22],"立秋":[8,7],"处暑":[8,23],"白露":[9,7],"秋分":[9,23],"寒露":[10,8],"霜降":[10,23],"立冬":[11,7],"小雪":[11,22],"大雪":[12,7],"冬至":[12,21]},
+  2026: {"立春":[2,4],"雨水":[2,19],"惊蛰":[3,5],"春分":[3,20],"清明":[4,4],"谷雨":[4,19],"立夏":[5,5],"小满":[5,21],"芒种":[6,5],"夏至":[6,21],"小暑":[7,7],"大暑":[7,22],"立秋":[8,7],"处暑":[8,23],"白露":[9,7],"秋分":[9,23],"寒露":[10,8],"霜降":[10,23],"立冬":[11,7],"小雪":[11,22],"大雪":[12,7],"冬至":[12,21]}
+};
+
+function safeMod(n, m) { return ((n % m) + m) % m; }
+function getYearGZ(year) { const diff = year - 2024; return { gan: TIAN_GAN[safeMod(diff,10)], zhi: DI_ZHI[safeMod(5+diff,12)] }; }
+function getDayGZ(year, month, day) { const base = new Date(2024,5,20); const target = new Date(year,month-1,day); const diff = Math.round((target-base)/86400000); return { gan: TIAN_GAN[safeMod(1+diff,10)], zhi: DI_ZHI[safeMod(3+diff,12)] }; }
+function getHourGZ(dayGan, hour) { const dayIdx = TIAN_GAN.indexOf(dayGan); const zhiIdx = Math.floor((hour+1)/2)%12; const startGan = [0,2,4,6,8][dayIdx%5]; return { gan: TIAN_GAN[(startGan+zhiIdx)%10], zhi: DI_ZHI[zhiIdx] }; }
+function getCurrentJieQi(year, month, day) { const data = JIE_QI_DATA[year] || JIE_QI_DATA[2026]; const order = ["立春","雨水","惊蛰","春分","清明","谷雨","立夏","小满","芒种","夏至","小暑","大暑","立秋","处暑","白露","秋分","寒露","霜降","立冬","小雪","大雪","冬至"]; let current = "夏至"; for (let name of order) { if (!data[name]) continue; const [m, d] = data[name]; if (month > m || (month === m && day >= d)) current = name; else break; } return current; }
+function getMonthGZ(year, month, day, yearGan) { const data = JIE_QI_DATA[year] || JIE_QI_DATA[2026]; const jieOrder = ["立春","惊蛰","清明","立夏","芒种","小暑","立秋","白露","寒露","立冬","大雪","冬至"]; let moonNum = 0; for (let i=0; i<jieOrder.length; i++) { const [m, d] = data[jieOrder[i]] || [0,0]; if (month > m || (month === m && day >= d)) moonNum = i; else break; } const monthZhi = DI_ZHI[(2+moonNum)%12]; const yIdx = TIAN_GAN.indexOf(yearGan); const startGan = [2,4,6,8,0][yIdx%5]; return { gan: TIAN_GAN[(startGan+moonNum)%10], zhi: monthZhi }; }
+const JIA_ZI = []; for (let i=0; i<60; i++) JIA_ZI.push(TIAN_GAN[i%10]+DI_ZHI[i%12]);
+const XUN_MAP = { "甲子":"戊","甲戌":"己","甲申":"庚","甲午":"辛","甲辰":"壬","甲寅":"癸" };
+function getYuanByZhi(zhi) { if (["子","午","卯","酉"].includes(zhi)) return 0; if (["寅","申","巳","亥"].includes(zhi)) return 1; return 2; }
+function getFuTou(dayGZ) { let idx = JIA_ZI.indexOf(dayGZ); while (idx !== -1) { if (JIA_ZI[idx][0]==="甲" || JIA_ZI[idx][0]==="己") return JIA_ZI[idx]; idx = (idx - 1 + 60) % 60; } return "甲子"; }
+
+function paiPan(year, month, day, hour) {
+  const yearGZ = getYearGZ(year), dayGZ = getDayGZ(year, month, day), hourGZ = getHourGZ(dayGZ.gan, hour);
+  const monthGZ = getMonthGZ(year, month, day, yearGZ.gan);
+  const jieQi = getCurrentJieQi(year, month, day);
+  const bazi = `${yearGZ.gan}${yearGZ.zhi} ${monthGZ.gan}${monthGZ.zhi} ${dayGZ.gan}${dayGZ.zhi} ${hourGZ.gan}${hourGZ.zhi}`;
+  const fuTou = getFuTou(bazi.split(' ')[2]), yuan = getYuanByZhi(fuTou[1]), yuanName = ["上","中","下"][yuan]+"元";
+  const isYang = YANG_DUN_LIST.includes(jieQi), ju = JU_TABLE[jieQi][yuan];
+  const diPan = {}, startNum = ju===5?2:ju, idxStart = GONG_NUMBERS.indexOf(startNum), dir = isYang?1:-1;
+  for (let i=0; i<9; i++) { const num = GONG_NUMBERS[safeMod(idxStart + i*dir, 9)]; if (num===5) { diPan[2]=diPan[2]||YI_QI[i]; continue; } diPan[num]=YI_QI[i]; }
+  diPan[5]=diPan[2];
+  const hourIdx = JIA_ZI.indexOf(hourGZ.gan+hourGZ.zhi); let xunShou=null;
+  for (let i=0; i<60; i++) { const idx = safeMod(hourIdx-i,60); if (JIA_ZI[idx][0]==="甲") { xunShou=JIA_ZI[idx]; break; } }
+  if (!xunShou) return { panText:"错误：无法确定旬首。" };
+  const xunYi = XUN_MAP[xunShou]; let xunYiGong=(xunYi==="戊")?2:null;
+  if (!xunYiGong) for (let g in diPan) if (diPan[g]===xunYi) { xunYiGong=+g; break; }
+  if (!xunYiGong) xunYiGong=2;
+  const zhiFuXing = (xunYiGong===2&&ju===5&&xunYi==="戊")?"禽":XING_LIST[safeMod(GONG_NUMBERS.indexOf(xunYiGong),8)];
+  const zhiShiMen = MEN_LIST[safeMod(GONG_NUMBERS.indexOf(xunYiGong),8)];
+  const zhiDiff = safeMod(DI_ZHI.indexOf(hourGZ.zhi)-DI_ZHI.indexOf(xunShou[1]),12);
+  const targetYi = YI_QI[safeMod(YI_QI.indexOf(xunYi)+zhiDiff,YI_QI.length)];
+  let zhiShiMenGong=(targetYi==="戊")?2:null;
+  if (!zhiShiMenGong) for (let g in diPan) if (diPan[g]===targetYi) { zhiShiMenGong=+g; break; }
+  if (!zhiShiMenGong) zhiShiMenGong=2;
+  const hourGan = hourGZ.gan; let hourGanGong=(hourGan==="戊")?2:null;
+  if (!hourGanGong) for (let g in diPan) if (diPan[g]===hourGan) { hourGanGong=+g; break; }
+  if (!hourGanGong) hourGanGong=2;
+  const starOrigIdx = XING_LIST.indexOf(zhiFuXing), destIdx = GONG_ORDER.indexOf(hourGanGong);
+  const xingAt={}, tianPan={};
+  for (let i=0; i<8; i++) { const gong=GONG_ORDER[i]; const sIdx=isYang?safeMod(starOrigIdx+(i-destIdx),8):safeMod(starOrigIdx-(i-destIdx),8); const star=XING_LIST[sIdx]; xingAt[gong]=star; tianPan[gong]=(star==="禽")?diPan[2]:diPan[GONG_NUMBERS[sIdx]]; }
+  const menOrigIdx = MEN_LIST.indexOf(zhiShiMen), menDestIdx = GONG_ORDER.indexOf(zhiShiMenGong), menAt={};
+  for (let i=0; i<8; i++) menAt[GONG_ORDER[i]]=MEN_LIST[safeMod(menOrigIdx+(i-menDestIdx),8)];
+  const shenDestIdx = GONG_ORDER.indexOf(hourGanGong), shenAt={};
+  for (let i=0; i<8; i++) shenAt[GONG_ORDER[i]]=SHEN_LIST[isYang?safeMod(i-shenDestIdx,8):safeMod(shenDestIdx-i,8)];
+  let panText = `━━━━━ 奇门遁甲排盘（转盘·拆补） ━━━━━\n公历：${year}年${month}月${day}日 ${hour}时\n八字：${bazi}\n节气：${jieQi} ${yuanName}\n局数：${isYang?'阳遁':'阴遁'}${ju}局  值符：${zhiFuXing}星  值使：${zhiShiMen}门\n━━━━━━━━━━━━━━━━━━━━\n`;
+  GONG_ORDER.forEach(g => { panText += `${GONG_NAMES[g]} | 天盘${tianPan[g]||'?'} | 地盘${diPan[g]||'?'} | ${xingAt[g]||'?'}星 | ${menAt[g]||'?'}门 | ${shenAt[g]||'?'}\n`; });
+  panText += `━━━━━━━━━━━━━━━━━━━━`;
+  return { panText };
+}
+
+const API_KEY = "sk-3e2b8635e6b042b68f0182de8eb54556"; // ⚠️ 替换为你的密钥
+async function callDeepSeek(prompt) {
+  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    method:"POST", headers:{"Content-Type":"application/json","Authorization":`Bearer ${API_KEY}`},
+    body: JSON.stringify({ model:"deepseek-chat", messages:[{role:"system",content:"你是奇门遁甲专家，严格按用户的解盘规则分析。"},{role:"user",content:prompt}], temperature:0.7, max_tokens:4000 })
+  });
+  if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || res.status); }
+  return (await res.json()).choices[0].message.content;
+}
+
+function startJiepan() {
+  const dt = document.getElementById("datetimeInput").value;
+  const question = document.getElementById("questionInput").value.trim();
+  const rules = document.getElementById("ruleInput").value.trim();
+  const school = document.getElementById("schoolInput").value || "转盘";
+  if (!dt || !question) { alert("请填写日期时间和问题！"); return; }
+  const [date, time] = dt.split("T");
+  if (!date || !time) { alert("日期或时间格式不正确"); return; }
+  const [y,m,d] = date.split("-").map(Number);
+  const hh = parseInt(time.split(":")[0]);
+  try {
+    const pan = paiPan(y, m, d, hh);
+    document.getElementById("panResult").textContent = pan.panText;
+    document.getElementById("panResult").classList.add("show");
+    document.getElementById("analysisResult").classList.remove("show");
+    document.querySelectorAll('.tab')[0].classList.add('active');
+    document.querySelectorAll('.tab')[1].classList.remove('active');
+    let prompt = `【流派】${school}\n【问题】${question}\n【盘面】\n${pan.panText}\n`;
+    if (rules) prompt += `【用户指定的看盘规则】\n${rules}\n`;
+    prompt += `请按“1.定局分析 2.用神定位 3.宫位分析 4.综合判断 5.结论建议”的格式输出。`;
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("submitBtn").disabled = true;
+    callDeepSeek(prompt).then(ans => {
+      document.getElementById("analysisResult").textContent = ans;
+      document.getElementById("analysisResult").classList.add("show");
+      showTab('analysis');
+    }).catch(e => {
+      document.getElementById("analysisResult").textContent = `出错：${e.message}`;
+      document.getElementById("analysisResult").classList.add("show");
+      showTab('analysis');
+    }).finally(() => {
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("submitBtn").disabled = false;
+    });
+  } catch (e) { alert("排盘过程发生错误：" + e.message); }
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === (tab === 'pan' ? 0 : 1)));
+  document.getElementById('panResult').classList.toggle('show', tab === 'pan');
+  document.getElementById('analysisResult').classList.toggle('show', tab === 'analysis');
+}
+window.onload = () => {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById("datetimeInput").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
+</script>
+</body>
+</html>
